@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>swing</groupId>
+    <artifactId>swing</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- 需要注意，javacv主要是一组API为主，还需要加入对应的实现 -->
+            <dependency>
+                <groupId>org.bytedeco</groupId>
+                <artifactId>javacv</artifactId>
+                <version>1.5.6</version>
+            </dependency>
+
+            <!-- 用到了 ffmpeg 需要把 ffmpeg 的平台实现依赖引入 -->
+            <dependency>
+                <groupId>org.bytedeco</groupId>
+                <artifactId>ffmpeg-platform</artifactId>
+                <version>4.4-1.5.6</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+
+
+</project>
