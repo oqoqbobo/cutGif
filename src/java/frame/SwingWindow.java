@@ -5,28 +5,22 @@ import component.MyCloseBtn;
 import component.MyPanel;
 import javafx.scene.image.Image;
 import lombok.Data;
-import org.bytedeco.ffmpeg.global.avcodec;
 import org.bytedeco.javacv.*;
 import org.bytedeco.javacv.Frame;
 import util.WindowUtil;
 
-import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
-import java.awt.image.BufferedImage;
 import java.io.*;
-import java.nio.Buffer;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 @Data
 public class SwingWindow extends JFrame {
     private static final int frameRate = 10;// 录制的帧率
-    private static Integer time = 0;
+    private static Integer theTimeCount = 0;
     private static SwingWindow instance;
 
     private Integer clickX;
@@ -64,7 +58,7 @@ public class SwingWindow extends JFrame {
     }
 
     private void recordHere(Integer offsetX,Integer offsetY,Integer width,Integer height) throws FrameGrabber.Exception, FrameRecorder.Exception, FileNotFoundException {
-        getInstance().getPanel().setContent("初始化开始。。。");
+
         FrameGrabber grabber = new FFmpegFrameGrabber("desktop");
         grabber.setFormat("gdigrab");
         grabber.setFrameRate(frameRate);
@@ -97,32 +91,30 @@ public class SwingWindow extends JFrame {
             @Override
             public void run() {
                 try {
-                    getInstance().getPanel().setContent(time.toString());
-                    if(time == 100){
+                    getInstance().getPanel().setContent(theTimeCount.toString());
+                    if(theTimeCount == 20){
                         // 停止
                         grabber.stop();
 
                         // 释放
                         grabber.release();
-                        time = 0;
-                        timer.cancel();
                         e.finish();
+                        theTimeCount = 0;
+                        timer.cancel();
                         getInstance().getPanel().setContent("录制完成。。。");
                         return;
                     }
-                    time += 1;
+                    theTimeCount += 1;
                     // 获取屏幕捕捉的一帧
                     Frame frame = grabber.grabFrame();
 
-                    //添加图片
+                    //添加帧
                     e.addFrame(converter.getBufferedImage(frame));
-
-                    Image convert = new JavaFXFrameConverter().convert(frame);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
-        }, 0, 1000 / frameRate);
+        }, 0, 1000 / frameRate); //执行逻辑   延迟时间   每次执行时间
     }
 
     public void init(){
