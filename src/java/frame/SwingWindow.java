@@ -43,7 +43,7 @@ public class SwingWindow extends JFrame {
     public SwingWindow(){
 
         this.setUndecorated(true); //这点奇怪，需要的
-        this.setBackground(new Color(238, 153, 154,30));
+        this.setBackground(new Color(238, 153, 154,10));
 //        this.setOpacity(0.1f);  组件也透明，不可取
         this.setVisible(true); //可见
 
@@ -71,11 +71,11 @@ public class SwingWindow extends JFrame {
 
         AnimatedGifEncoder e = new AnimatedGifEncoder();
         // 设置生成图片大小
-        e.setSize(900, 1000);
+        e.setSize(width, height);
         //生成的图片路径
-        e.start(new FileOutputStream("D://testGif.gif"));
+        e.start(new FileOutputStream("E://testGif.gif"));
         //图片之间间隔时间
-        e.setDelay(500);
+        e.setDelay(100);
         //重复次数 0表示无限重复 默认不重复
         e.setRepeat(0);
         Java2DFrameConverter converter = new Java2DFrameConverter();
