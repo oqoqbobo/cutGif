@@ -64,7 +64,7 @@ public class SwingWindow extends JFrame {
             }
         }
     }
-
+    //获取yaml文件的对应key的值
     public static String getKeyValue(String setValue,LinkedHashMap<String, Object> sourceMap,String dicKey) throws Exception {
         String[] split = dicKey.split("\\.");
         if(split.length <= 0){
