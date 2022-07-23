@@ -1,1 +1,4 @@
-.idea
+.svn/
+target/
+.idea/
+*.iml
