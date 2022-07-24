@@ -4,20 +4,25 @@ import com.madgag.gif.fmsware.AnimatedGifEncoder;
 import com.madgag.gif.fmsware.GifDecoder;
 import component.MyCloseBtn;
 import component.MyPanel;
-import javafx.scene.image.Image;
 import lombok.Data;
-import lombok.Value;
 import org.bytedeco.javacv.*;
 import org.bytedeco.javacv.Frame;
 import org.yaml.snakeyaml.Yaml;
 import util.WindowUtil;
 
-import javax.imageio.ImageIO;
+import javax.imageio.*;
+import javax.imageio.metadata.IIOInvalidTreeException;
+import javax.imageio.metadata.IIOMetadata;
+import javax.imageio.metadata.IIOMetadataNode;
+import javax.imageio.stream.FileImageOutputStream;
+import javax.imageio.stream.ImageOutputStream;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
+import java.awt.geom.AffineTransform;
+import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.util.LinkedHashMap;
@@ -25,7 +30,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 @Data
 public class SwingWindow extends JFrame {
-    private String giftPath = "123.gif";
+    private String gifPath = "123.gif";
     private String output = "/output";
     private static final int frameRate = 10;// 录制的帧率
     private static Integer theTimeCount = 0;
@@ -48,10 +53,10 @@ public class SwingWindow extends JFrame {
             in = SwingWindow.class.getClassLoader().getResourceAsStream("application.yaml");
             LinkedHashMap<String, Object> sourceMap = (LinkedHashMap) yaml.load(in);
             //setValue 是递归时传递的值，一开始为空
-            giftPath = getKeyValue(null, sourceMap, "web.filePath");
+            gifPath = getKeyValue(null, sourceMap, "web.filePath");
             output = getKeyValue(null, sourceMap, "web.output");
             System.out.println(output);
-            System.out.println(giftPath);
+            System.out.println(gifPath);
         }catch (Exception e){
             e.printStackTrace();
         }finally {
@@ -118,28 +123,88 @@ public class SwingWindow extends JFrame {
         this.init();
 
     }
+    private static IIOMetadataNode getNode(IIOMetadataNode rootNode, String nodeName) {
+        int nNodes = rootNode.getLength();
+        for (int i = 0; i < nNodes; i++) {
+            if (rootNode.item(i).getNodeName().equalsIgnoreCase(nodeName)) {
+                return (IIOMetadataNode) rootNode.item(i);
+            }
+        }
+        IIOMetadataNode node = new IIOMetadataNode(nodeName);
+        rootNode.appendChild(node);
+        return node;
+    }
+
+    private void configureRootMetadata(IIOMetadata metadata,int delay, boolean loop) throws IIOInvalidTreeException {
+        String metaFormatName = metadata.getNativeMetadataFormatName();
+        IIOMetadataNode root = (IIOMetadataNode) metadata.getAsTree(metaFormatName);
+        IIOMetadataNode graphicsControlExtensionNode = getNode(root, "GraphicControlExtension");
+        graphicsControlExtensionNode.setAttribute("disposalMethod", "none");
+        graphicsControlExtensionNode.setAttribute("userInputFlag", "FALSE");
+        graphicsControlExtensionNode.setAttribute("transparentColorFlag", "FALSE");
+        graphicsControlExtensionNode.setAttribute("delayTime", Integer.toString(delay / 10));
+        graphicsControlExtensionNode.setAttribute("transparentColorIndex", "0");
+        IIOMetadataNode appExtensionsNode = getNode(root, "ApplicationExtensions");
+        IIOMetadataNode child = new IIOMetadataNode("ApplicationExtension");
+        child.setAttribute("applicationID", "NETSCAPE");
+        child.setAttribute("authenticationCode", "2.0");
+
+        int loopContinuously = loop ? 0 : 1;
+        child.setUserObject(new byte[]{0x1, (byte) (loopContinuously & 0xFF), (byte) ((loopContinuously >> 8) & 0xFF)});
+        appExtensionsNode.appendChild(child);
+        metadata.setFromTree(metaFormatName, root);
+    }
+
+    public void convert(BufferedImage[] images, ImageOutputStream outputStream, int delay, boolean loop) {
+        ImageWriter writer = ImageIO.getImageWritersBySuffix("gif").next();
+        try {
+            //图像类型
+            writer.setOutput(outputStream); //设置输出流
+            ImageWriteParam params = writer.getDefaultWriteParam();
+            IIOMetadata metadata = writer.getDefaultImageMetadata(ImageTypeSpecifier.createFromBufferedImageType(images[0].getType()), params);
+            //配置元数据  delay 单位毫秒  loop 是否重复（true表示重复）
+            configureRootMetadata(metadata,delay,loop);
+            writer.prepareWriteSequence(null); //初始化
+
+            for (BufferedImage image : images) {
+                writer.writeToSequence(new IIOImage(image,null,metadata), params);
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException("GIF convert error", e);
+        }finally {
+            try {
+                if(writer != null && outputStream != null){
+                    writer.endWriteSequence();
+                    writer.reset();
+                    writer.dispose();
+
+                    outputStream.flush();
+                    outputStream.close();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
     //将output文件中每一帧按顺序生成一张gif
     public void frameToGif(){
         try {
-            AnimatedGifEncoder animate = new AnimatedGifEncoder();
-            //图片之间间隔时间
-            animate.setDelay(100);
-            //重复次数 0表示无限重复 默认不重复
-            animate.setRepeat(0);
-            //生成的图片路径
-            animate.start(new FileOutputStream(giftPath));
+            FileImageOutputStream fileImageOutputStream = new FileImageOutputStream(new File(gifPath));
 
             File folder = new File(output);
             File[] files = folder.listFiles();
+            BufferedImage[] imgList = new BufferedImage[files.length];
+            int index = 0;
             for (File file : files){
                 System.out.println(file.getPath());
                 BufferedImage image = ImageIO.read(new File(file.getPath()));
-                // 设置生成图片大小
-                animate.setSize(image.getWidth(), image.getHeight());
-                animate.addFrame(image);
+                imgList[index] = image;
+                index++;
             }
-            animate.finish();
+
+            convert(imgList,fileImageOutputStream,100,true);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -149,13 +214,13 @@ public class SwingWindow extends JFrame {
     public void getFrameByGIF(){
         try {
             //用于获取图像的帧
-            FFmpegFrameGrabber grabberGif = new FFmpegFrameGrabber(giftPath);
+            FFmpegFrameGrabber grabberGif = new FFmpegFrameGrabber(gifPath);
             grabberGif.start();
 
             String path = output;
             GifDecoder gd = new GifDecoder();
             //要处理的图片
-            File gif = new File(giftPath);
+            File gif = new File(gifPath);
             gd.read(new FileInputStream(gif)); //用于获取帧数（数量）
             String fileName = gif.getName().substring(0, gif.getName().lastIndexOf("."));
             String fileTail = gif.getName().substring(gif.getName().lastIndexOf("."));
@@ -196,7 +261,7 @@ public class SwingWindow extends JFrame {
         // 设置生成图片大小
         e.setSize(width, height);
         //生成的图片路径
-        e.start(new FileOutputStream(giftPath));
+        e.start(new FileOutputStream(gifPath));
         //图片之间间隔时间
         e.setDelay(100);
         //重复次数 0表示无限重复 默认不重复
