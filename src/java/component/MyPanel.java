@@ -1,15 +1,21 @@
 package component;
 
 import lombok.Data;
+import util.WindowUtil;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.image.BufferedImage;
+
 @Data
 public class MyPanel extends JPanel {
+    //矩形
     private Integer clickX = 0;
     private Integer clickY = 0;
     private Integer myWidth = 0;
     private Integer myLength = 0;
+    //帧
+    private Image[] images;
 
     private String content = "";
 
@@ -32,6 +38,9 @@ public class MyPanel extends JPanel {
     public void drawFont(String content){
         this.setContent(content);
     }
+    public void drawImage(Image[] images){
+        setImages(images);
+    }
 
     @Override
     public void paint(Graphics g) {
@@ -40,6 +49,19 @@ public class MyPanel extends JPanel {
         g.drawRect(clickX,clickY,myWidth,myLength);//绘制矩形
         g.setFont(new Font("华文行楷",1,30));
         g.drawString(content, clickX-10, clickY-10);
+        if(this.getImages() != null && getImages().length > 0){
+            Integer index = 1;
+            Integer flag = 0;
+            for(Image img : getImages()){
+                if(img.getWidth(this)*(index+2) > WindowUtil.getWinWidth()){
+                    //换行
+                    flag++;
+                    index = 1;
+                }
+                g.drawImage(img,img.getWidth(null)*index,100 + img.getHeight(null) * flag,this);
+                index++;
+            }
+        }
         this.repaint();//刷新绘制
     }
 }

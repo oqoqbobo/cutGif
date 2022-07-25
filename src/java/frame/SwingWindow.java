@@ -14,6 +14,7 @@ import javax.imageio.*;
 import javax.imageio.metadata.IIOInvalidTreeException;
 import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.metadata.IIOMetadataNode;
+import javax.imageio.spi.ImageWriterSpi;
 import javax.imageio.stream.FileImageOutputStream;
 import javax.imageio.stream.ImageOutputStream;
 import javax.swing.*;
@@ -25,9 +26,11 @@ import java.awt.geom.AffineTransform;
 import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.io.*;
-import java.util.LinkedHashMap;
+import java.lang.reflect.Array;
+import java.util.*;
 import java.util.Timer;
-import java.util.TimerTask;
+import java.util.stream.Stream;
+
 @Data
 public class SwingWindow extends JFrame {
     private String gifPath = "123.gif";
@@ -155,7 +158,31 @@ public class SwingWindow extends JFrame {
         metadata.setFromTree(metaFormatName, root);
     }
 
-    public void convert(BufferedImage[] images, ImageOutputStream outputStream, int delay, boolean loop) {
+    //导出实体的gif  缺点：提供png图片作为帧，但是导出效果是实体的，很烦
+    public void animatedGif(BufferedImage[] images) throws Exception {
+        if(images == null || images.length<=0){
+            throw new Exception("请传递images参数");
+        }
+        AnimatedGifEncoder animated = new AnimatedGifEncoder();
+        //生成的图片路径
+        animated.start(new FileOutputStream(gifPath));
+        // 设置生成图片大小
+        animated.setSize(images[0].getWidth(null), images[0].getHeight(null));
+        //图片之间间隔时间 单位毫秒
+        animated.setDelay(100);
+        //重复次数 0表示无限重复 默认不重复
+        animated.setRepeat(0);
+        for(BufferedImage img : images){
+            animated.addFrame(img);
+        }
+        animated.finish();
+    }
+
+    //导出透明背景的gif  缺点，gif有残影，且每一帧图片会出现多余的镂空现象（和原图不一样）
+    public void convert(BufferedImage[] images, ImageOutputStream outputStream) throws Exception {
+        if(images == null || images.length<=0){
+            throw new Exception("请传递images参数");
+        }
         ImageWriter writer = ImageIO.getImageWritersBySuffix("gif").next();
         try {
             //图像类型
@@ -163,11 +190,12 @@ public class SwingWindow extends JFrame {
             ImageWriteParam params = writer.getDefaultWriteParam();
             IIOMetadata metadata = writer.getDefaultImageMetadata(ImageTypeSpecifier.createFromBufferedImageType(images[0].getType()), params);
             //配置元数据  delay 单位毫秒  loop 是否重复（true表示重复）
-            configureRootMetadata(metadata,delay,loop);
+            configureRootMetadata(metadata,100,true);
             writer.prepareWriteSequence(null); //初始化
 
+            AffineTransformOp op = new AffineTransformOp(AffineTransform.getScaleInstance(1, 1), null);
             for (BufferedImage image : images) {
-                writer.writeToSequence(new IIOImage(image,null,metadata), params);
+                writer.writeToSequence(new IIOImage(op.filter(image,null), null,metadata), params);
             }
 
         } catch (Exception e) {
@@ -203,8 +231,11 @@ public class SwingWindow extends JFrame {
                 imgList[index] = image;
                 index++;
             }
-
-            convert(imgList,fileImageOutputStream,100,true);
+            //画出每一帧
+            getInstance().getPanel().drawImage(imgList);
+            //制作gif
+            animatedGif(imgList);
+//            convert(imgList,fileImageOutputStream);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -262,7 +293,7 @@ public class SwingWindow extends JFrame {
         e.setSize(width, height);
         //生成的图片路径
         e.start(new FileOutputStream(gifPath));
-        //图片之间间隔时间
+        //图片之间间隔时间 单位毫秒
         e.setDelay(100);
         //重复次数 0表示无限重复 默认不重复
         e.setRepeat(0);
