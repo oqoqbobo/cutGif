@@ -1,5 +1,5 @@
 web:
-  filePath: "E://testGif.gif"
-  output: "E://output//"
+  filePath: "D://testGif.gif"
+  output: "D://output"
   otherObj:
     haha: "nihao"

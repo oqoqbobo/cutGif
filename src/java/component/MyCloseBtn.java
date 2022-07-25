@@ -12,7 +12,7 @@ public class MyCloseBtn extends JButton {
         this.setBorderPainted(false);
         this.setBackground(Color.RED);
         this.setForeground(Color.WHITE);
-        this.setFont(new Font("华文行楷",1,20));
+        this.setFont(new Font("微软雅黑",1,20));
         this.addActionListener(actionEvent -> {
             System.exit(0);
         });
