@@ -48,7 +48,7 @@ public class MyPanel extends JPanel {
         super.paint(g);//继承父类的绘制方式
         g.drawRect(clickX,clickY,myWidth,myLength);//绘制矩形
         g.setFont(new Font("微软雅黑",1,30));
-        g.drawString(content, clickX-10, clickY-10);
+        g.drawString(content, clickX+10, clickY+40);
         if(this.getImages() != null && getImages().length > 0){
             Integer index = 1;
             Integer flag = 0;

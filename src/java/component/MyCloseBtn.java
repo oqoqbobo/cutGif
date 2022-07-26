@@ -20,6 +20,8 @@ public class MyCloseBtn extends JButton {
 
     @Override
     public void paint(Graphics g) {
+        //每次绘制都要重新定位，因为调用了父类的绘制方法
+        this.setBounds(WindowUtil.getWinWidth() - 30, 0, 30, 30);
         super.paint(g);
         //重新绘制
         g.drawString("X",9,22);

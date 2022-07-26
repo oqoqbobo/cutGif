@@ -117,7 +117,7 @@ public class SwingWindow extends JFrame {
 //        this.setOpacity(0.1f);  组件也透明，不可取
         this.setVisible(true); //可见
 
-        this.setSize(WindowUtil.getWinWidth(),WindowUtil.getWinHeight());
+        this.setSize(WindowUtil.getWinWidth(),WindowUtil.getWinHeight()-60);
         /*****目前可有可无******/
         this.setResizable(false); //不可改变大小
         this.setLocationRelativeTo(null); //居中
@@ -169,7 +169,7 @@ public class SwingWindow extends JFrame {
         // 设置生成图片大小
         animated.setSize(images[0].getWidth(null), images[0].getHeight(null));
         //图片之间间隔时间 单位毫秒
-        animated.setDelay(100);
+        animated.setDelay(10);
         //重复次数 0表示无限重复 默认不重复
         animated.setRepeat(0);
         for(BufferedImage img : images){
@@ -231,10 +231,10 @@ public class SwingWindow extends JFrame {
                 imgList[index] = image;
                 index++;
             }
-            //画出每一帧
-            getInstance().getPanel().drawImage(imgList);
             //制作gif
             animatedGif(imgList);
+            //画出每一帧
+            getInstance().getPanel().drawImage(imgList);
 //            convert(imgList,fileImageOutputStream);
         } catch (Exception e) {
             e.printStackTrace();
@@ -294,7 +294,7 @@ public class SwingWindow extends JFrame {
         //生成的图片路径
         e.start(new FileOutputStream(gifPath));
         //图片之间间隔时间 单位毫秒
-        e.setDelay(100);
+        e.setDelay(10);
         //重复次数 0表示无限重复 默认不重复
         e.setRepeat(0);
         Java2DFrameConverter converter = new Java2DFrameConverter();
@@ -333,7 +333,7 @@ public class SwingWindow extends JFrame {
                     e.printStackTrace();
                 }
             }
-        }, 5000, 1000 / frameRate); //执行逻辑   延迟时间   每次执行时间
+        }, 0, 100 / frameRate); //执行逻辑   延迟时间   每次执行时间
     }
 
     public void init(){
