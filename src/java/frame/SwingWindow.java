@@ -169,7 +169,7 @@ public class SwingWindow extends JFrame {
         // 设置生成图片大小
         animated.setSize(images[0].getWidth(null), images[0].getHeight(null));
         //图片之间间隔时间 单位毫秒
-        animated.setDelay(10);
+        animated.setDelay(100);
         //重复次数 0表示无限重复 默认不重复
         animated.setRepeat(0);
         for(BufferedImage img : images){
@@ -195,7 +195,7 @@ public class SwingWindow extends JFrame {
 
             AffineTransformOp op = new AffineTransformOp(AffineTransform.getScaleInstance(1, 1), null);
             for (BufferedImage image : images) {
-                writer.writeToSequence(new IIOImage(op.filter(image,null), null,metadata), params);
+                writer.writeToSequence(new IIOImage(image, null,metadata), params);
             }
 
         } catch (Exception e) {
