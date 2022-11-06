@@ -46,6 +46,10 @@ public class MyPanel extends JPanel {
     public void paint(Graphics g) {
         this.setOpaque(false); //将面板设置为透明的
         super.paint(g);//继承父类的绘制方式
+        if(WindowUtil.getWinWidth() - 30 <= clickX && clickY <= 30){
+            System.out.println("这里是关闭按钮");
+            return;
+        }
         g.drawRect(clickX,clickY,myWidth,myLength);//绘制矩形
         g.setFont(new Font("微软雅黑",1,30));
         g.drawString(content, clickX+10, clickY+40);

@@ -8,7 +8,9 @@ import lombok.Data;
 import org.bytedeco.javacv.*;
 import org.bytedeco.javacv.Frame;
 import org.yaml.snakeyaml.Yaml;
+import thread.Recording;
 import util.WindowUtil;
+import utils.StringBuilderQueue;
 
 import javax.imageio.*;
 import javax.imageio.metadata.IIOInvalidTreeException;
@@ -19,29 +21,32 @@ import javax.imageio.stream.FileImageOutputStream;
 import javax.imageio.stream.ImageOutputStream;
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseMotionAdapter;
+import java.awt.event.*;
 import java.awt.geom.AffineTransform;
 import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.lang.reflect.Array;
+import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.List;
 import java.util.Timer;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Data
 public class SwingWindow extends JFrame {
     private String gifPath = "123.gif";
     private String output = "/output";
-    private static final int frameRate = 10;// 录制的帧率
+    private static final int frameRate = 100;// 录制的帧率
     private static Integer theTimeCount = 0;
     private static SwingWindow instance;
 
     private Integer clickX;
     private Integer clickY;
     private MyPanel panel;
+
+    private Recording recordLock = new Recording();
 
     //用于录制视频
     private Integer offsetX;
@@ -119,9 +124,9 @@ public class SwingWindow extends JFrame {
 
         this.setSize(WindowUtil.getWinWidth(),WindowUtil.getWinHeight()-60);
         /*****目前可有可无******/
-        this.setResizable(false); //不可改变大小
+/*        this.setResizable(false); //不可改变大小
         this.setLocationRelativeTo(null); //居中
-        this.setDefaultCloseOperation(EXIT_ON_CLOSE); //默认关闭形式
+        this.setDefaultCloseOperation(EXIT_ON_CLOSE); //默认关闭形式*/
         /*****目前可有可无******/
         this.init();
 
@@ -169,7 +174,7 @@ public class SwingWindow extends JFrame {
         // 设置生成图片大小
         animated.setSize(images[0].getWidth(null), images[0].getHeight(null));
         //图片之间间隔时间 单位毫秒
-        animated.setDelay(100);
+        animated.setDelay(frameRate);
         //重复次数 0表示无限重复 默认不重复
         animated.setRepeat(0);
         for(BufferedImage img : images){
@@ -216,26 +221,44 @@ public class SwingWindow extends JFrame {
         }
     }
 
+
+    private String outContain(String str){
+        if(str.startsWith("(")){
+            str = str.substring(1);
+        }
+        if(str.endsWith(")")){
+            str = str.substring(0,str.length()-1);
+        }
+        return str;
+    }
+
+
     //将output文件中每一帧按顺序生成一张gif
     public void frameToGif(){
         try {
-            FileImageOutputStream fileImageOutputStream = new FileImageOutputStream(new File(gifPath));
+//            FileImageOutputStream fileImageOutputStream = new FileImageOutputStream(new File(gifPath));
 
             File folder = new File(output);
             File[] files = folder.listFiles();
+            Map<Integer,File> result = new TreeMap<>();
+            for (File file : files) {
+                String yStr = file.getName().substring(file.getName().indexOf("("), file.getName().indexOf(")"));
+                int key = Integer.parseInt(outContain(yStr));
+                result.put(key,file);
+            }
+
+
             BufferedImage[] imgList = new BufferedImage[files.length];
-            int index = 0;
-            for (File file : files){
-                System.out.println(file.getPath());
-                BufferedImage image = ImageIO.read(new File(file.getPath()));
+            for (Integer index : result.keySet()){
+                BufferedImage image = ImageIO.read(result.get(index));
                 imgList[index] = image;
-                index++;
             }
             //制作gif
             animatedGif(imgList);
             //画出每一帧
-            getInstance().getPanel().drawImage(imgList);
+//            getInstance().getPanel().drawImage(imgList);
 //            convert(imgList,fileImageOutputStream);
+            System.out.println("制作完成！");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -262,85 +285,107 @@ public class SwingWindow extends JFrame {
                 //取得gif的每一帧
                 Frame frame = grabberGif.grabImage(); //会自动获取下一帧，特别注意
                 String newName = fileName+ "("+i+")";
-                File oneFrame = new File(path+newName+fileTail);
-                if(!oneFrame.exists()){
-                    oneFrame.mkdirs();
-                    System.out.println("创建文件成功！");
-                }
-                ImageIO.write(converter.getBufferedImage(frame),"jpg",oneFrame);
-                System.out.println("生成一帧："+oneFrame.getPath());
+                setOneFrame(converter.getBufferedImage(frame),path+"/"+newName+fileTail);
             }
             
         }catch (Exception e) {
             e.printStackTrace();
         }
     }
+    private void setOneFrame(BufferedImage capture,String path) throws IOException {
+        File oneFrame = new File(path);
+        if(!oneFrame.exists()){
+            oneFrame.mkdirs();
+//            System.out.println("创建文件成功！");
+        }
+        ImageIO.write(capture,"jpg",oneFrame);
+//        System.out.println("生成一帧："+oneFrame.getPath());
+    }
 
-    private void recordHere(Integer offsetX,Integer offsetY,Integer width,Integer height) throws FrameGrabber.Exception, FrameRecorder.Exception, FileNotFoundException {
+    public void recordHere(Timer timer) throws AWTException {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
 
-        FrameGrabber grabber = new FFmpegFrameGrabber("desktop");
-        grabber.setFormat("gdigrab");
-        grabber.setFrameRate(frameRate);
-        // 捕获指定区域，不设置则为全屏
-        grabber.setImageHeight(height);
-        grabber.setImageWidth(width);
-        grabber.setOption("offset_x", offsetX.toString());
-        grabber.setOption("offset_y", offsetY.toString());//必须设置了大小才能指定区域起点，参数可参考 FFmpeg 入参
-        grabber.start();
+        if(recordWidth == null || recordHeight == null || (recordWidth <= 100 && recordHeight <= 100)){
+            System.out.println("录制框框太小");
+            return;
+        }
 
-        AnimatedGifEncoder e = new AnimatedGifEncoder();
-        // 设置生成图片大小
-        e.setSize(width, height);
-        //生成的图片路径
-        e.start(new FileOutputStream(gifPath));
-        //图片之间间隔时间 单位毫秒
-        e.setDelay(10);
-        //重复次数 0表示无限重复 默认不重复
-        e.setRepeat(0);
-        Java2DFrameConverter converter = new Java2DFrameConverter();
-        // 用于存储视频 , 先调用stop，在释放，就会在指定位置输出文件，，这里我保存到D盘
-        /*FrameRecorder recorder = FrameRecorder.createDefault("D://output.avi", grabber.getImageWidth(), grabber.getImageHeight());
-        recorder.setFrameRate(frameRate);
-        recorder.setVideoCodec(avcodec.AV_CODEC_ID_H264);// 编码，使用编码能让视频占用内存更小，根据实际自行选择
-        recorder.start();*/
+        //删除源文件夹里的内容
+        File originFile = new File(output);
+        for (File file : originFile.listFiles()) {
+            file.delete();
+        }
+
+
         getInstance().getPanel().setContent("初始化完成。。。");
-        Timer timer = new Timer();
 
+        Robot robot= new Robot();
+        String fileName = sdf.format(new Date());
+        String fileTail = "jpg";
+        StringBuilder sb = new StringBuilder();
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
                 try {
+                    sb.setLength(0);
                     getInstance().getPanel().setContent(theTimeCount.toString());
-                    if(theTimeCount == 100){
-                        // 停止
-                        grabber.stop();
-
-                        // 释放
-                        grabber.release();
-                        e.finish();
+                    BufferedImage capture = robot.createScreenCapture(new Rectangle(clickX, clickY, recordWidth, recordHeight));
+                    String newName = fileName+ "("+theTimeCount+")";
+                    sb.append(output).append("/").append(newName).append(".").append(fileTail);
+                    setOneFrame(capture,sb.toString());
+                    if(theTimeCount == 368){
                         theTimeCount = 0;
                         timer.cancel();
                         getInstance().getPanel().setContent("录制完成。。。");
                         return;
                     }
                     theTimeCount += 1;
-                    // 获取屏幕捕捉的一帧
-                    Frame frame = grabber.grabFrame();
 
-                    //添加帧
-                    e.addFrame(converter.getBufferedImage(frame));
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
-        }, 0, 100 / frameRate); //执行逻辑   延迟时间   每次执行时间
+        }, 0, frameRate); //执行逻辑   延迟时间   每次执行时间
     }
 
     public void init(){
+        this.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if(theTimeCount != 0){
+                    System.out.println("正在录制，输入指令无效");
+                    return;
+                }
+                StringBuilderQueue queue = StringBuilderQueue.getInstance();
+                if(e.getKeyCode() == 10){
+                    queue.append('~',e.getKeyCode());
+                }else if(e.getKeyCode() == 8){
+                    queue.back();
+                }else{
+                    queue.append(e.getKeyChar(),e.getKeyCode());
+                }
+
+                String str = queue.getLastIndexOfString(4);
+                if(str.equals("gif~")){
+                    System.out.println("开始制作gif！");
+                    frameToGif();
+                }
+                str = queue.getLastIndexOfString(6);
+                if(str.equals("start~")){
+                    System.out.println("开始录制gif帧！");
+                    new Thread(recordLock).start();
+                }
+            }
+
+        });
         //添加鼠标点击事件
         this.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                if(theTimeCount != 0){
+                    System.out.println("正在录屏中");
+                    return;
+                }
                 //点击前初始化整个展示画面（相当于还原）
                 getInstance().getPanel().drawClear();
                 System.out.println("press: "+e.getX());
@@ -351,11 +396,15 @@ public class SwingWindow extends JFrame {
             }
             @Override
             public void mouseReleased(MouseEvent e) {
+                if(theTimeCount != 0){
+                    System.out.println("正在录屏中");
+                    return;
+                }
                 System.out.println("release: "+e.getX());
                 System.out.println("release: "+e.getY());
 
                 try {
-                    recordHere(offsetX,offsetY,recordWidth,recordHeight);
+//                    frameToGif();
                 } catch (Exception e1) {
                     e1.printStackTrace();
                 }
@@ -366,6 +415,10 @@ public class SwingWindow extends JFrame {
 
             @Override
             public void mouseDragged(MouseEvent e) {
+                if(theTimeCount != 0){
+                    System.out.println("正在录屏中");
+                    return;
+                }
                 System.out.println("move:"+e.getX());
                 System.out.println("move:"+e.getY());
                 Integer clickX = getInstance().getClickX();
@@ -404,10 +457,11 @@ public class SwingWindow extends JFrame {
         container.add(panel);
 
         MyCloseBtn myClose = new MyCloseBtn();
-        container.add(myClose);
+        panel.add(myClose);
     }
     public static void main(String [] args){
-        SwingWindow.getInstance().frameToGif();
+//        SwingWindow.getInstance().frameToGif();
+        SwingWindow.getInstance();
 //        SwingWindow.getInstance().getFrameByGIF();
     }
 

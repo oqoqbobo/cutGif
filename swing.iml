@@ -11,7 +11,6 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="Maven: org.yaml:snakeyaml:1.25" level="project" />
-    <orderEntry type="library" name="Maven: org.yaml:snakeyaml:1.25" level="project" />
     <orderEntry type="library" name="Maven: org.bytedeco:javacv:1.5.6" level="project" />
     <orderEntry type="library" name="Maven: org.bytedeco:javacpp:1.5.6" level="project" />
     <orderEntry type="library" name="Maven: org.bytedeco:openblas:0.3.17-1.5.6" level="project" />
