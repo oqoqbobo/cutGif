@@ -15,7 +15,7 @@ public class Recording implements Runnable {
     private Timer timer = new Timer();
     @Override
     public void run() {
-        synchronized (this){
+        synchronized (SourceOutputLock.getLock()){
             timer = new Timer();
             try {
                 SwingWindow.getInstance().recordHere(timer);

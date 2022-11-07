@@ -8,6 +8,7 @@ import lombok.Data;
 import org.bytedeco.javacv.*;
 import org.bytedeco.javacv.Frame;
 import org.yaml.snakeyaml.Yaml;
+import thread.MakeingGIF;
 import thread.Recording;
 import util.WindowUtil;
 import utils.StringBuilderQueue;
@@ -47,6 +48,7 @@ public class SwingWindow extends JFrame {
     private MyPanel panel;
 
     private Recording recordLock = new Recording();
+    private MakeingGIF gifLock = new MakeingGIF();
 
     //用于录制视频
     private Integer offsetX;
@@ -368,7 +370,7 @@ public class SwingWindow extends JFrame {
                 String str = queue.getLastIndexOfString(4);
                 if(str.equals("gif~")){
                     System.out.println("开始制作gif！");
-                    frameToGif();
+                    new Thread(gifLock).start();
                 }
                 str = queue.getLastIndexOfString(6);
                 if(str.equals("start~")){
@@ -388,8 +390,8 @@ public class SwingWindow extends JFrame {
                 }
                 //点击前初始化整个展示画面（相当于还原）
                 getInstance().getPanel().drawClear();
-                System.out.println("press: "+e.getX());
-                System.out.println("press: "+e.getY());
+                System.out.println("pressX: "+e.getX());
+                System.out.println("pressY: "+e.getY());
                 //初始化点击位置
                 getInstance().setClickX(e.getX());
                 getInstance().setClickY(e.getY());
@@ -400,14 +402,8 @@ public class SwingWindow extends JFrame {
                     System.out.println("正在录屏中");
                     return;
                 }
-                System.out.println("release: "+e.getX());
-                System.out.println("release: "+e.getY());
-
-                try {
-//                    frameToGif();
-                } catch (Exception e1) {
-                    e1.printStackTrace();
-                }
+                System.out.println("releaseX: "+e.getX());
+                System.out.println("releaseY: "+e.getY());
 
             }
         });
@@ -419,8 +415,6 @@ public class SwingWindow extends JFrame {
                     System.out.println("正在录屏中");
                     return;
                 }
-                System.out.println("move:"+e.getX());
-                System.out.println("move:"+e.getY());
                 Integer clickX = getInstance().getClickX();
                 Integer clickY = getInstance().getClickY();
                 Integer width = 0;
@@ -440,7 +434,7 @@ public class SwingWindow extends JFrame {
                     length = e.getY() - clickY;
                 }
 
-                System.out.println("x:"+clickX + "   y:"+clickY + "   width:"+width+"    length:"+length);
+                System.out.println("moveX:"+clickX + "\tmoveY:"+clickY + "\twidth:"+width+"\tlength:"+length);
                 getInstance().getPanel().draw(clickX,clickY,width,length);
                 getInstance().setOffsetX(clickX);
                 getInstance().setOffsetY(clickY);
