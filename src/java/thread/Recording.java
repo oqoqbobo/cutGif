@@ -20,7 +20,7 @@ public class Recording implements Runnable {
             try {
                 SwingWindow.getInstance().recordHere(timer);
             }catch (Exception e) {
-                throw new RuntimeException(e);
+                e.printStackTrace();
             }
 
         }

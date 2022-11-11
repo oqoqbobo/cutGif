@@ -10,7 +10,7 @@ public class StringBuilderQueue {
     private StringBuilder sb;
     private List<Integer> sbIndex;
 
-    private Integer length = 10;
+    private Integer length = 30;
 
     public Integer getLength() {
         return length;

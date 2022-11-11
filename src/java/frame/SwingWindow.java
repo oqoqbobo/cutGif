@@ -8,6 +8,7 @@ import lombok.Data;
 import org.bytedeco.javacv.*;
 import org.bytedeco.javacv.Frame;
 import org.yaml.snakeyaml.Yaml;
+import thread.DisassembleGIF;
 import thread.MakeingGIF;
 import thread.Recording;
 import util.WindowUtil;
@@ -17,8 +18,6 @@ import javax.imageio.*;
 import javax.imageio.metadata.IIOInvalidTreeException;
 import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.metadata.IIOMetadataNode;
-import javax.imageio.spi.ImageWriterSpi;
-import javax.imageio.stream.FileImageOutputStream;
 import javax.imageio.stream.ImageOutputStream;
 import javax.swing.*;
 import java.awt.*;
@@ -27,13 +26,9 @@ import java.awt.geom.AffineTransform;
 import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.io.*;
-import java.lang.reflect.Array;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.List;
 import java.util.Timer;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Data
 public class SwingWindow extends JFrame {
@@ -47,14 +42,18 @@ public class SwingWindow extends JFrame {
     private Integer clickY;
     private MyPanel panel;
 
-    private Recording recordLock = new Recording();
-    private MakeingGIF gifLock = new MakeingGIF();
+    private Recording recordRunnable = new Recording();
+    private MakeingGIF gifRunnable = new MakeingGIF();
+    private DisassembleGIF disassembleRunnable = new DisassembleGIF();
 
     //用于录制视频
     private Integer offsetX;
     private Integer offsetY;
     private Integer recordWidth;
     private Integer recordHeight;
+
+    private static Integer currentKeyCode = null;
+    private final static Integer CTRL = 17;
 
     {
         InputStream in = null;
@@ -120,7 +119,7 @@ public class SwingWindow extends JFrame {
     public SwingWindow(){
 
         this.setUndecorated(true); //这点奇怪，需要的
-        this.setBackground(new Color(238, 153, 154,10));
+        this.setBackground(new Color(238, 153, 154,1));
 //        this.setOpacity(0.1f);  组件也透明，不可取
         this.setVisible(true); //可见
 
@@ -132,6 +131,7 @@ public class SwingWindow extends JFrame {
         /*****目前可有可无******/
         this.init();
 
+        this.getPanel().revalidate();
     }
     private static IIOMetadataNode getNode(IIOMetadataNode rootNode, String nodeName) {
         int nNodes = rootNode.getLength();
@@ -179,8 +179,14 @@ public class SwingWindow extends JFrame {
         animated.setDelay(frameRate);
         //重复次数 0表示无限重复 默认不重复
         animated.setRepeat(0);
+        int step = 4;
+        int index = 0;
+
         for(BufferedImage img : images){
-            animated.addFrame(img);
+            if(index%step == 0){
+                animated.addFrame(img);
+            }
+            index++;
         }
         animated.finish();
     }
@@ -269,6 +275,13 @@ public class SwingWindow extends JFrame {
     //将gif分解成每一帧，保存到output文件加中
     public void getFrameByGIF(){
         try {
+
+            //删除源文件夹里的内容
+            File originFile = new File(output);
+            for (File file : originFile.listFiles()) {
+                file.delete();
+            }
+
             //用于获取图像的帧
             FFmpegFrameGrabber grabberGif = new FFmpegFrameGrabber(gifPath);
             grabberGif.start();
@@ -289,6 +302,7 @@ public class SwingWindow extends JFrame {
                 String newName = fileName+ "("+i+")";
                 setOneFrame(converter.getBufferedImage(frame),path+"/"+newName+fileTail);
             }
+            System.out.println("拆解完成！");
             
         }catch (Exception e) {
             e.printStackTrace();
@@ -317,7 +331,6 @@ public class SwingWindow extends JFrame {
         for (File file : originFile.listFiles()) {
             file.delete();
         }
-
 
         getInstance().getPanel().setContent("初始化完成。。。");
 
@@ -353,11 +366,18 @@ public class SwingWindow extends JFrame {
     public void init(){
         this.addKeyListener(new KeyAdapter() {
             @Override
+            public void keyReleased(KeyEvent e) {
+                currentKeyCode = null;
+            }
+
+            @Override
             public void keyPressed(KeyEvent e) {
                 if(theTimeCount != 0){
                     System.out.println("正在录制，输入指令无效");
                     return;
                 }
+
+                currentKeyCode = e.getKeyCode();
                 StringBuilderQueue queue = StringBuilderQueue.getInstance();
                 if(e.getKeyCode() == 10){
                     queue.append('~',e.getKeyCode());
@@ -367,15 +387,20 @@ public class SwingWindow extends JFrame {
                     queue.append(e.getKeyChar(),e.getKeyCode());
                 }
 
-                String str = queue.getLastIndexOfString(4);
+                String str = queue.getLastIndexOfString("gif~".length());
                 if(str.equals("gif~")){
                     System.out.println("开始制作gif！");
-                    new Thread(gifLock).start();
+                    new Thread(gifRunnable).start();
                 }
-                str = queue.getLastIndexOfString(6);
+                str = queue.getLastIndexOfString("start~".length());
                 if(str.equals("start~")){
                     System.out.println("开始录制gif帧！");
-                    new Thread(recordLock).start();
+                    new Thread(recordRunnable).start();
+                }
+                str = queue.getLastIndexOfString("disassemble~".length());
+                if(str.equals("disassemble~")){
+                    System.out.println("开始拆解gif！");
+                    new Thread(disassembleRunnable).start();
                 }
             }
 
@@ -388,8 +413,15 @@ public class SwingWindow extends JFrame {
                     System.out.println("正在录屏中");
                     return;
                 }
-                //点击前初始化整个展示画面（相当于还原）
-                getInstance().getPanel().drawClear();
+                if(CTRL == currentKeyCode){
+                    getInstance().getPanel().draw(e.getX(),e.getY());
+                    return;
+                }else{
+                    //满足需要拖拽的情况下，不清空！！！！！
+                    //点击前初始化整个展示画面（相当于还原）
+                    getInstance().getPanel().drawClear();
+                }
+
                 System.out.println("pressX: "+e.getX());
                 System.out.println("pressY: "+e.getY());
                 //初始化点击位置
@@ -405,6 +437,8 @@ public class SwingWindow extends JFrame {
                 System.out.println("releaseX: "+e.getX());
                 System.out.println("releaseY: "+e.getY());
 
+                SwingWindow.getInstance().getPanel().setContent("ceshi");
+
             }
         });
         this.addMouseMotionListener(new MouseMotionAdapter() {
@@ -417,9 +451,18 @@ public class SwingWindow extends JFrame {
                 }
                 Integer clickX = getInstance().getClickX();
                 Integer clickY = getInstance().getClickY();
+                getInstance().setOffsetX(clickX);
+                getInstance().setOffsetY(clickY);
+
+                if(CTRL == currentKeyCode){
+                    getInstance().getPanel().draw(e.getX(),e.getY());
+                    return;
+                }
+
                 Integer width = 0;
                 Integer length = 0;
-
+//                System.out.println("currentKeyCode   "+currentKeyCode+" ,CTRL   "+CTRL);
+//                System.out.println(CTRL == currentKeyCode);
                 if(e.getX() < clickX){
                     width = clickX - e.getX();
                     clickX = e.getX();
@@ -436,8 +479,6 @@ public class SwingWindow extends JFrame {
 
                 System.out.println("moveX:"+clickX + "\tmoveY:"+clickY + "\twidth:"+width+"\tlength:"+length);
                 getInstance().getPanel().draw(clickX,clickY,width,length);
-                getInstance().setOffsetX(clickX);
-                getInstance().setOffsetY(clickY);
                 getInstance().setRecordWidth(width);
                 getInstance().setRecordHeight(length);
 
